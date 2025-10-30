@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import StateColumn from "./StateColumn";
-import { DndContext, closestCenter } from "@dnd-kit/core";
+import { DndContext, closestCenter, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable } from "@dnd-kit/sortable";
 import "./BoardView.css";
 
@@ -73,15 +73,43 @@ export default function BoardView({ board, goBack }) {
 
     function handleTaskDragEnd(event) {
         const { active, over } = event;
+        console.log('BoardView: handleTaskDragEnd', { active, over });
         if (active && over && active.id !== undefined && over.id !== undefined) {
             const taskId = active.id;
             const newStateId = over.id;
             const boardId = board.id;
+            // Find the full task object
+            let movedTask = null;
+            for (const tasks of Object.values(stateTasks)) {
+                const found = tasks.find(t => t.id === taskId);
+                if (found) {
+                    movedTask = found;
+                    break;
+                }
+            }
+            if (!movedTask) {
+                console.error('BoardView: moved task not found', taskId);
+                return;
+            }
+            // Send all task data plus newStateId
             fetch(`http://localhost:5000/api/boards/${boardId}/states/${newStateId}/tasks/${taskId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            }).then(() => {
+                body: JSON.stringify({
+                    ...movedTask,
+                    state_id: newStateId,
+                    board_id: boardId
+                }),
+            })
+            .then(res => {
+                if (!res.ok) {
+                    res.text().then(text => {
+                        console.error('BoardView: move task failed', res.status, text);
+                    });
+                }
+                return res;
+            })
+            .then(() => {
                 fetchStatesAndTasks();
             });
         }
@@ -127,6 +155,17 @@ export default function BoardView({ board, goBack }) {
         setEditStateName("");
     }
 
+    // Find the dragged task object for overlay
+    const draggedTaskObj = draggedTask
+        ? Object.values(stateTasks).flat().find(t => t.id === draggedTask)
+        : null;
+
+    // Gather all task IDs for SortableContext
+    const allTaskIds = Object.values(stateTasks).flat().map(task => task.id);
+
+    // No-op fallback for handlers
+    const noop = () => {};
+
     return (
         <div className="board-view-page">
             <div className="board-view-container">
@@ -136,8 +175,12 @@ export default function BoardView({ board, goBack }) {
                     <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required className="board-view-input" />
                     <button type="submit" className="board-view-add-btn">Add Column</button>
                 </form>
-                <DndContext collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
-                    <SortableContext items={states.map(s => s.id)}>
+                <DndContext
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTaskDragEnd || noop}
+                    onDragStart={handleTaskDragStart || noop}
+                >
+                    <SortableContext items={allTaskIds}>
                         <div className="board-view-columns-row">
                             <div className="board-view-columns">
                                 {states.map(state => (
@@ -163,6 +206,16 @@ export default function BoardView({ board, goBack }) {
                             </div>
                         </div>
                     </SortableContext>
+                    <DragOverlay>
+                        {draggedTaskObj ? (
+                            <div style={{ zIndex: 9999 }}>
+                                <div className="task-card task-card-relative" style={{ pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', background: '#fff', borderRadius: 8 }}>
+                                    <strong className="task-card-title">{draggedTaskObj.title}</strong>
+                                    <div className="task-card-content">{draggedTaskObj.content}</div>
+                                </div>
+                            </div>
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
             </div>
         </div>

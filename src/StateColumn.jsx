@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import TaskCard from "./TaskCard";
-import { DndContext, closestCenter, useDroppable, useDraggable } from "@dnd-kit/core";
-import { SortableContext } from "@dnd-kit/sortable";
+import { closestCenter, useDroppable, useDraggable } from "@dnd-kit/core";
 import "./StateColumn.css";
 import { useModalOpen } from './ModalOpenContext.jsx';
 
@@ -148,29 +147,9 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
                     </>
                 )}
             </div>
-            {/* DndContext and SortableContext temporarily disabled for modal testing */}
-            {/*
-            <DndContext collisionDetection={closestCenter} onDragEnd={handleTaskDragEnd} disabled={modalOpen}>
-                <SortableContext items={tasks.map(t => t.id)}>
-                    <div className="state-column-tasks">
-                        {tasks.map(task => (
-                            <DraggableTaskCard
-                                key={task.id}
-                                task={task}
-                                stateId={state.id}
-                                boardId={state.board_id}
-                                onEdit={handleEditTask}
-                                onDelete={handleDeleteTask}
-                            />
-                        ))}
-                    </div>
-                </SortableContext>
-            </DndContext>
-            */}
-            {/* Render tasks directly for modal testing */}
             <div className="state-column-tasks">
                 {tasks.map(task => (
-                    <TaskCard
+                    <DraggableTaskCard
                         key={task.id}
                         task={task}
                         stateId={state.id}
