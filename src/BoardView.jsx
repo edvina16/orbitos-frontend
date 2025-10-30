@@ -35,7 +35,7 @@ export default function BoardView({ board, goBack }) {
 
     useEffect(() => {
         fetchStatesAndTasks();
-    }, [board.id]);
+    }, []); // Remove dependency warning
 
     function handleCreateState(e) {
         e.preventDefault();
@@ -49,22 +49,6 @@ export default function BoardView({ board, goBack }) {
                 setStateName("");
                 fetchStatesAndTasks(); // Always refresh from backend
             });
-    }
-
-    function handleColumnDragEnd(event) {
-        const { active, over } = event;
-        if (active && over && active.id !== over.id) {
-            const oldIndex = states.findIndex(s => s.id === active.id);
-            const newIndex = states.findIndex(s => s.id === over.id);
-            const newOrder = arrayMove(states, oldIndex, newIndex);
-            setStates(newOrder);
-            // Persist new order to backend
-            fetch(`http://localhost:5000/api/boards/${board.id}/states/order`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ order: newOrder.map(s => s.id) })
-            }).then(() => fetchStatesAndTasks());
-        }
     }
 
     function handleTaskDragStart(event) {
@@ -114,14 +98,6 @@ export default function BoardView({ board, goBack }) {
             });
         }
         setDraggedTask(null);
-    }
-
-    function onTaskCreated() {
-        fetchStatesAndTasks();
-    }
-
-    function onTasksChanged() {
-        fetchStatesAndTasks();
     }
 
     function handleEditState(state) {
@@ -193,7 +169,7 @@ export default function BoardView({ board, goBack }) {
                                         onTasksChanged={(action, payload) => {
                                             if (action === 'editState') handleEditState(payload);
                                             else if (action === 'deleteState') handleDeleteState(payload);
-                                            else onTasksChanged();
+                                            else fetchStatesAndTasks();
                                         }}
                                         editStateId={editStateId}
                                         editStateName={editStateName}
@@ -209,7 +185,7 @@ export default function BoardView({ board, goBack }) {
                     <DragOverlay>
                         {draggedTaskObj ? (
                             <div style={{ zIndex: 9999 }}>
-                                <div className="task-card task-card-relative" style={{ pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', background: '#fff', borderRadius: 8 }}>
+                                <div className="task-card task-card-relative" style={{ pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', background: 'var(--bg)', color: 'var(--text)', borderRadius: 8 }}>
                                     <strong className="task-card-title">{draggedTaskObj.title}</strong>
                                     <div className="task-card-content">{draggedTaskObj.content}</div>
                                 </div>

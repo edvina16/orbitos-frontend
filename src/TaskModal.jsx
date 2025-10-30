@@ -89,29 +89,31 @@ export default function TaskModal({ task, onClose, onSave, onDelete }) {
                         >
                             Cancel
                         </button>
-                        <button
-                            type="button"
-                            className="task-modal-menu-btn"
-                            onClick={e => { e.stopPropagation(); setMenuOpen(m => !m); }}
-                            title="Task actions"
-                            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
-                            onMouseUp={e => { e.preventDefault(); e.stopPropagation(); }}
-                            onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
-                            onPointerUp={e => { e.preventDefault(); e.stopPropagation(); }}
-                        >
-                            <span style={{ fontSize: '1.5em', verticalAlign: 'middle' }}>⋮</span>
-                        </button>
+                        <div className="task-modal-menu-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+                            <button
+                                type="button"
+                                className="task-modal-menu-btn"
+                                onClick={e => { e.stopPropagation(); setMenuOpen(m => !m); }}
+                                title="Task actions"
+                                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                                onMouseUp={e => { e.preventDefault(); e.stopPropagation(); }}
+                                onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                                onPointerUp={e => { e.preventDefault(); e.stopPropagation(); }}
+                            >
+                                <span style={{ fontSize: '1.5em', verticalAlign: 'middle' }}>⋮</span>
+                            </button>
+                            {menuOpen && (
+                                <div
+                                    className="task-modal-menu"
+                                    aria-hidden={!menuOpen}
+                                    style={{ display: menuOpen ? 'block' : 'none' }}
+                                >
+                                    <button type="button" className="task-modal-menu-item" onClick={handleDelete}>Delete</button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </form>
-                {menuOpen && (
-                    <div
-                        className="task-modal-menu"
-                        aria-hidden={!menuOpen}
-                        style={{ display: menuOpen ? 'block' : 'none' }}
-                    >
-                        <button type="button" className="task-modal-menu-item" onClick={handleDelete}>Delete Task</button>
-                    </div>
-                )}
             </div>
         </div>
     );

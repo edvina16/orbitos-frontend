@@ -1,19 +1,14 @@
 import React, { useState } from "react";
 import TaskCard from "./TaskCard";
-import { closestCenter, useDroppable, useDraggable } from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import "./StateColumn.css";
-import { useModalOpen } from './ModalOpenContext.jsx';
 
-export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, editStateId, editStateName, onUpdateState, setEditStateName, handleCancelEditState, handleTaskDragEnd }) {
+export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, editStateId, editStateName, onUpdateState, setEditStateName, handleCancelEditState }) {
     const [title, setTitle] = React.useState("");
     const [content, setContent] = React.useState("");
-    const [editTaskId, setEditTaskId] = React.useState(null);
-    const [editTitle, setEditTitle] = React.useState("");
-    const [editContent, setEditContent] = React.useState("");
     const [showAddTaskForm, setShowAddTaskForm] = React.useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const { setNodeRef } = useDroppable({ id: dndStateId });
-    const { modalOpen } = useModalOpen();
 
     function handleCreateTask(e) {
         e.preventDefault();
@@ -76,33 +71,6 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
         });
     }
 
-    // Rename setter function to avoid collision
-    function setEditTaskFields(task) {
-        setEditTaskId(task.id);
-        setEditTitle(task.title);
-        setEditContent(task.content);
-    }
-
-    function handleUpdateTask(e) {
-        e.preventDefault();
-        fetch(`http://localhost:5000/api/boards/${state.board_id}/states/${state.id}/tasks/${editTaskId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: editTitle, content: editContent })
-        }).then(() => {
-            setEditTaskId(null);
-            setEditTitle("");
-            setEditContent("");
-            if (onTasksChanged) onTasksChanged();
-        });
-    }
-
-    function handleCancelEdit() {
-        setEditTaskId(null);
-        setEditTitle("");
-        setEditContent("");
-    }
-
     function handleShowAddTaskForm() {
         setShowAddTaskForm(true);
     }
@@ -124,8 +92,10 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
                             className="state-column-input"
                             style={{ flex: 1, minWidth: 0 }}
                         />
-                        <button type="submit" className="state-column-form-btn-save">Save</button>
-                        <button type="button" onClick={handleCancelEditState} className="state-column-form-btn-cancel">Cancel</button>
+                        <div className="state-column-form-row">
+                            <button type="submit" className="state-column-form-btn-save">Save</button>
+                            <button type="button" onClick={handleCancelEditState} className="state-column-form-btn-cancel">Cancel</button>
+                        </div>
                     </form>
                 ) : (
                     <>
@@ -198,6 +168,8 @@ function DraggableTaskCard({ task, stateId, boardId, onDelete, onEdit }) {
                         opacity: isDragging ? 0.5 : 1,
                         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
                         pointerEvents: modalOpen ? 'none' : 'auto',
+                        background: 'var(--bg)', // Ensure background matches theme
+                        borderRadius: '8px', // match TaskCard style
                     }}
                     {...listeners}
                     {...attributes}
