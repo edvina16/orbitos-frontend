@@ -1,7 +1,10 @@
 import React, { useState } from "react";
+import "./BoardList.css";
 
-export default function BoardList({ boards, onSelect, onBoardCreated }) {
+export default function BoardList({ boards, onSelect, onBoardCreated, onBoardUpdated, onBoardDeleted }) {
     const [name, setName] = useState("");
+    const [editBoardId, setEditBoardId] = useState(null);
+    const [editBoardName, setEditBoardName] = useState("");
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -17,20 +20,73 @@ export default function BoardList({ boards, onSelect, onBoardCreated }) {
             });
     }
 
+    function handleEditBoard(board) {
+        setEditBoardId(board.id);
+        setEditBoardName(board.name);
+    }
+
+    function handleUpdateBoard(e) {
+        e.preventDefault();
+        fetch(`http://localhost:5000/api/boards/${editBoardId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: editBoardName })
+        }).then(res => res.json()).then(updated => {
+            setEditBoardId(null);
+            setEditBoardName("");
+            if (onBoardUpdated) onBoardUpdated(updated);
+        });
+    }
+
+    function handleDeleteBoard(boardId) {
+        fetch(`http://localhost:5000/api/boards/${boardId}`, {
+            method: "DELETE"
+        }).then(() => {
+            if (onBoardDeleted) onBoardDeleted(boardId);
+        });
+    }
+
+    function handleCancelEdit() {
+        setEditBoardId(null);
+        setEditBoardName("");
+    }
+
     return (
-        <div style={{ maxWidth: "500px", margin: "48px auto", background: "#f3f4f6", borderRadius: "16px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", padding: "40px 32px" }}>
-            <h2 style={{ marginBottom: "28px", fontSize: "2rem", fontWeight: "700", color: "#1e293b", letterSpacing: "-1px" }}>Boards</h2>
-            <form onSubmit={handleSubmit} style={{ display: "flex", gap: "16px", marginBottom: "32px" }}>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="Board name" required style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff", fontSize: "1rem", color: "#334155" }} />
-                <button type="submit" style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: "linear-gradient(90deg,#2563eb 0%,#1d4ed8 100%)", color: "#fff", fontWeight: "600", fontSize: "1rem", boxShadow: "0 2px 8px rgba(37,99,235,0.08)", cursor: "pointer", transition: "background 0.2s" }}>Create Board</button>
+        <div className="board-list-container">
+            <h2 className="board-list-title">Boards</h2>
+            <form onSubmit={handleSubmit} className="board-list-form">
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Board name" required className="board-list-input" />
+                <button type="submit" className="board-list-create-btn">Create Board</button>
             </form>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            <ul className="board-list-ul">
                 {boards.length === 0 ? (
-                    <li style={{ color: "#64748b", fontStyle: "italic", textAlign: "center", padding: "16px 0" }}>No boards yet. Create one above!</li>
+                    <li className="board-list-empty">No boards yet. Create one above!</li>
                 ) : (
                     boards.map(board => (
-                        <li key={board.id} style={{ marginBottom: "16px" }}>
-                            <button onClick={() => onSelect(board)} style={{ width: "100%", padding: "16px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#fff", fontWeight: "600", fontSize: "1.1rem", cursor: "pointer", color: "#2563eb", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", transition: "background 0.2s" }}>{board.name}</button>
+                        <li key={board.id} className="board-list-li">
+                            {editBoardId === board.id ? (
+                                <form onSubmit={handleUpdateBoard} className="board-list-edit-form">
+                                    <input value={editBoardName} onChange={e => setEditBoardName(e.target.value)} required className="board-list-edit-input" />
+                                    <button type="submit" className="board-list-save-btn">Save</button>
+                                    <button type="button" onClick={handleCancelEdit} className="board-list-cancel-btn">Cancel</button>
+                                </form>
+                            ) : (
+                                <div className="board-list-card-row">
+                                    <button onClick={() => onSelect(board)} className="board-list-card-btn">{board.name}</button>
+                                    <button onClick={() => handleEditBoard(board)} title="Edit board" className="board-list-icon-btn">
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M3 17h2.5l9.1-9.1a1.5 1.5 0 0 0-2.1-2.1L3.4 14.9V17z" stroke="var(--accent)" strokeWidth="2" fill="none"/>
+                                            <path d="M13.5 6.5l2 2" stroke="var(--accent)" strokeWidth="2" fill="none"/>
+                                        </svg>
+                                    </button>
+                                    <button onClick={() => handleDeleteBoard(board.id)} title="Delete board" className="board-list-icon-btn">
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <line x1="5" y1="5" x2="15" y2="15" stroke="var(--heading)" strokeWidth="2"/>
+                                            <line x1="15" y1="5" x2="5" y2="15" stroke="var(--heading)" strokeWidth="2"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                         </li>
                     ))
                 )}

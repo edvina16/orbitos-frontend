@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from "react";
 import StateColumn from "./StateColumn";
-import { DndContext } from "@dnd-kit/core";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable } from "@dnd-kit/sortable";
+import "./BoardView.css";
 
 export default function BoardView({ board, goBack }) {
     const [states, setStates] = useState([]);
     const [stateTasks, setStateTasks] = useState({});
     const [stateName, setStateName] = useState("");
     const [draggedTask, setDraggedTask] = useState(null);
+    const [editStateId, setEditStateId] = useState(null);
+    const [editStateName, setEditStateName] = useState("");
 
     function fetchStatesAndTasks() {
+        console.log('BoardView: fetchStatesAndTasks called');
         fetch(`http://localhost:5000/api/boards/${board.id}/states`)
             .then(res => res.json())
             .then(async data => {
@@ -23,6 +28,7 @@ export default function BoardView({ board, goBack }) {
                     })
                 );
                 setStateTasks(tasksByState);
+                console.log('BoardView: tasksByState after update', tasksByState);
             })
             .catch(console.error);
     }
@@ -45,11 +51,27 @@ export default function BoardView({ board, goBack }) {
             });
     }
 
-    function handleDragStart(event) {
+    function handleColumnDragEnd(event) {
+        const { active, over } = event;
+        if (active && over && active.id !== over.id) {
+            const oldIndex = states.findIndex(s => s.id === active.id);
+            const newIndex = states.findIndex(s => s.id === over.id);
+            const newOrder = arrayMove(states, oldIndex, newIndex);
+            setStates(newOrder);
+            // Persist new order to backend
+            fetch(`http://localhost:5000/api/boards/${board.id}/states/order`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order: newOrder.map(s => s.id) })
+            }).then(() => fetchStatesAndTasks());
+        }
+    }
+
+    function handleTaskDragStart(event) {
         setDraggedTask(event.active.id);
     }
 
-    function handleDragEnd(event) {
+    function handleTaskDragEnd(event) {
         const { active, over } = event;
         if (active && over && active.id !== undefined && over.id !== undefined) {
             const taskId = active.id;
@@ -70,23 +92,109 @@ export default function BoardView({ board, goBack }) {
         fetchStatesAndTasks();
     }
 
+    function onTasksChanged() {
+        fetchStatesAndTasks();
+    }
+
+    function handleEditState(state) {
+        setEditStateId(state.id);
+        setEditStateName(state.name);
+    }
+
+    function handleUpdateState(e) {
+        e.preventDefault();
+        fetch(`http://localhost:5000/api/boards/${board.id}/states/${editStateId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: editStateName })
+        }).then(res => res.json()).then(() => {
+            setEditStateId(null);
+            setEditStateName("");
+            fetchStatesAndTasks();
+        });
+    }
+
+    function handleDeleteState(stateId) {
+        fetch(`http://localhost:5000/api/boards/${board.id}/states/${stateId}`, {
+            method: "DELETE"
+        }).then(() => {
+            fetchStatesAndTasks();
+        });
+    }
+
+    function handleCancelEditState() {
+        setEditStateId(null);
+        setEditStateName("");
+    }
+
     return (
-        <div style={{ padding: "32px", background: "#f4f6fa", minHeight: "100vh" }}>
-            <div style={{ maxWidth: "900px", margin: "0 auto", background: "#fff", borderRadius: "16px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", padding: "40px 32px" }}>
-                <button onClick={goBack} style={{ marginBottom: "16px", padding: "10px 20px", borderRadius: "8px", border: "none", background: "#e0e7ef", color: "#2563eb", fontWeight: "600", cursor: "pointer" }}>Back to boards</button>
-                <h2 style={{ marginBottom: "24px", fontSize: "2rem", fontWeight: "700", color: "#1e293b" }}>{board.name}</h2>
-                <form onSubmit={handleCreateState} style={{ display: "flex", gap: "16px", marginBottom: "32px" }}>
-                    <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#f8fafc", fontSize: "1rem", color: "#334155" }} />
-                    <button type="submit" style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: "linear-gradient(90deg,#22c55e 0%,#16a34a 100%)", color: "#fff", fontWeight: "600", fontSize: "1rem", boxShadow: "0 2px 8px rgba(34,197,94,0.08)", cursor: "pointer", transition: "background 0.2s" }}>Add Column</button>
+        <div className="board-view-page">
+            <div className="board-view-container">
+                <button onClick={goBack} className="board-view-back-btn">Back to boards</button>
+                <h2 className="board-view-title">{board.name}</h2>
+                <form onSubmit={handleCreateState} className="board-view-form">
+                    <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required className="board-view-input" />
+                    <button type="submit" className="board-view-add-btn">Add Column</button>
                 </form>
-                <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto" }}>
-                        {states.map(state => (
-                            <StateColumn key={state.id} state={state} tasks={stateTasks[state.id] || []} dndStateId={state.id} onTaskCreated={onTaskCreated} />
-                        ))}
-                    </div>
+                <DndContext collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+                    <SortableContext items={states.map(s => s.id)}>
+                        <div className="board-view-columns-row">
+                            <div className="board-view-columns">
+                                {states.map(state => (
+                                    <SortableStateColumn
+                                        key={state.id}
+                                        id={state.id}
+                                        state={state}
+                                        tasks={stateTasks[state.id] || []}
+                                        dndStateId={state.id}
+                                        onTasksChanged={(action, payload) => {
+                                            if (action === 'editState') handleEditState(payload);
+                                            else if (action === 'deleteState') handleDeleteState(payload);
+                                            else onTasksChanged();
+                                        }}
+                                        editStateId={editStateId}
+                                        editStateName={editStateName}
+                                        onUpdateState={handleUpdateState}
+                                        setEditStateName={setEditStateName}
+                                        handleCancelEditState={handleCancelEditState}
+                                        handleTaskDragEnd={handleTaskDragEnd}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </SortableContext>
                 </DndContext>
             </div>
+        </div>
+    );
+}
+
+function SortableStateColumn(props) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.id });
+    return (
+        <div ref={setNodeRef} style={{
+            transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+            transition,
+            opacity: isDragging ? 0.5 : 1,
+            position: 'relative',
+        }}>
+            <div
+                {...attributes}
+                {...listeners}
+                className="state-column-drag-bar"
+                style={{
+                    width: '100%',
+                    height: 32,
+                    background: 'transparent',
+                    cursor: 'grab',
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                    userSelect: 'none',
+                    zIndex: 3,
+                }}
+                aria-label="Drag column"
+            />
+            <StateColumn {...props} />
         </div>
     );
 }

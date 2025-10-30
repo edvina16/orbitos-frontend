@@ -1,5 +1,5 @@
 // This file sets up React Router for your frontend, matching your Go backend API routes.
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import BoardList from "./BoardList";
 import BoardView from "./BoardView";
@@ -9,22 +9,40 @@ function BoardListPage() {
     const navigate = useNavigate();
 
     React.useEffect(() => {
+        fetchBoards();
+    }, []);
+
+    function fetchBoards() {
         fetch("http://localhost:5000/api/boards")
             .then(res => res.json())
             .then(data => setBoards(Array.isArray(data) ? data : []))
             .catch(console.error);
-    }, []);
+    }
 
     function handleSelectBoard(board) {
         navigate(`/boards/${board.id}`);
     }
 
     function handleBoardCreated(newBoard) {
-        setBoards(prev => [...prev, newBoard]);
+        fetchBoards();
+    }
+
+    function handleBoardUpdated() {
+        fetchBoards();
+    }
+
+    function handleBoardDeleted() {
+        fetchBoards();
     }
 
     return (
-        <BoardList boards={boards} onSelect={handleSelectBoard} onBoardCreated={handleBoardCreated} />
+        <BoardList
+            boards={boards}
+            onSelect={handleSelectBoard}
+            onBoardCreated={handleBoardCreated}
+            onBoardUpdated={handleBoardUpdated}
+            onBoardDeleted={handleBoardDeleted}
+        />
     );
 }
 
@@ -45,10 +63,29 @@ function BoardViewPage() {
 }
 
 export default function App() {
+    const [theme, setTheme] = useState(() => {
+        return localStorage.getItem("theme") || "dark";
+    });
+
+    useEffect(() => {
+        document.documentElement.classList.remove("light", "dark");
+        document.documentElement.classList.add(theme);
+        localStorage.setItem("theme", theme);
+    }, [theme]);
+
+    function toggleTheme() {
+        setTheme(t => (t === "dark" ? "light" : "dark"));
+    }
+
     return (
         <Router>
             <div>
-                <h1 style={{ textAlign: "center", margin: "32px 0", fontSize: "2.5rem", color: "#2563eb" }}>ICpal</h1>
+                <div style={{ display: "flex", alignItems: "center", margin: "32px 0 0 0" }}>
+                    <h1 className="app-title">ICpal</h1>
+                    <button onClick={toggleTheme} style={{ marginLeft: "auto", padding: "8px 16px", fontSize: "1rem" }}>
+                        {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+                    </button>
+                </div>
                 <Routes>
                     <Route path="/boards" element={<BoardListPage />} />
                     <Route path="/boards/:id" element={<BoardViewPage />} />
@@ -58,4 +95,3 @@ export default function App() {
         </Router>
     );
 }
-
