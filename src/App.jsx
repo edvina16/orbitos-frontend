@@ -81,7 +81,7 @@ export default function App() {
         <Router>
             <div>
                 <div style={{ display: "flex", alignItems: "center", margin: "32px 0 0 0" }}>
-                    <h1 className="app-title">ICpal</h1>
+                    <h1 className="app-title">atmon</h1>
                     <button onClick={toggleTheme} style={{ marginLeft: "auto", padding: "8px 16px", fontSize: "1rem" }}>
                         {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
                     </button>
