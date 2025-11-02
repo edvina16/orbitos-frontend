@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import TaskCard from "./TaskCard";
+import TaskModal from "./TaskModal";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import "./StateColumn.css";
 
@@ -12,9 +13,13 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
 
     function handleCreateTask(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${state.board_id}/states/${state.id}/tasks`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ title, content }),
         })
             .then(res => res.json())
@@ -28,9 +33,13 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
 
     function handleEditTask(updatedTask) {
         console.log('StateColumn: handleEditTask called', updatedTask);
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${state.board_id}/states/${state.id}/tasks/${updatedTask.id}`, {
-            method: "PUT", // Changed from POST to PUT for REST convention and backend compatibility
-            headers: { "Content-Type": "application/json" },
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ title: updatedTask.title, content: updatedTask.content })
         })
         .then(res => {
@@ -54,8 +63,10 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
 
     function handleDeleteTask(taskId) {
         console.log('StateColumn: handleDeleteTask called', taskId);
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/tasks/${taskId}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         .then(res => {
             console.log('StateColumn: handleDeleteTask response', res);
@@ -82,6 +93,7 @@ export default function StateColumn({ state, tasks, dndStateId, onTasksChanged, 
 
     return (
         <div ref={setNodeRef} className="state-column">
+            {console.log('StateColumn render, tasks:', tasks.map(t => t.id))}
             <div className="state-column-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {editStateId === state.id ? (
                     <form onSubmit={onUpdateState} className="state-column-form" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
@@ -161,28 +173,23 @@ function DraggableTaskCard({ task, stateId, boardId, onDelete, onEdit }) {
     }
     return (
         <>
-            {!modalOpen && (
-                <div
-                    ref={setNodeRef}
-                    style={{
-                        opacity: isDragging ? 0.5 : 1,
-                        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-                        pointerEvents: modalOpen ? 'none' : 'auto',
-                        background: 'var(--bg)', // Ensure background matches theme
-                        borderRadius: '8px', // match TaskCard style
-                    }}
-                    {...listeners}
-                    {...attributes}
-                    onClick={e => {
-                        if (!isDragging) {
-                            e.stopPropagation();
-                            setModalOpen(true);
-                        }
-                    }}
-                >
-                    <TaskCard task={task} stateId={stateId} boardId={boardId} onEdit={onEdit} onDelete={onDelete} />
-                </div>
-            )}
+            <div
+                ref={setNodeRef}
+                style={{
+                    opacity: isDragging ? 0.5 : 1,
+                    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+                    pointerEvents: modalOpen ? 'none' : 'auto',
+                    background: 'var(--bg)', // Ensure background matches theme
+                    borderRadius: '8px', // match TaskCard style
+                }}
+                {...listeners}
+                {...attributes}
+            >
+                <TaskCard
+                    task={task}
+                    onDoubleClick={() => setModalOpen(true)}
+                />
+            </div>
             {modalOpen && (
                 <TaskModal
                     task={task}

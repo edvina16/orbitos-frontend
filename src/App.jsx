@@ -3,17 +3,28 @@ import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import BoardList from "./BoardList";
 import BoardView from "./BoardView";
+import Login from "./Login";
+import SignUp from "./SignUp";
+import { signOut } from "./auth";
 
 function BoardListPage() {
     const [boards, setBoards] = React.useState([]);
     const navigate = useNavigate();
 
     React.useEffect(() => {
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
         fetchBoards();
     }, []);
 
     function fetchBoards() {
-        fetch("http://localhost:5000/api/boards")
+        const token = localStorage.getItem("jwt");
+        fetch("http://localhost:5000/api/boards", {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
             .then(res => res.json())
             .then(data => setBoards(Array.isArray(data) ? data : []))
             .catch(console.error);
@@ -52,7 +63,14 @@ function BoardViewPage() {
     const navigate = useNavigate();
 
     React.useEffect(() => {
-        fetch(`http://localhost:5000/api/boards/${id}`)
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+        fetch(`http://localhost:5000/api/boards/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
             .then(res => res.json())
             .then(data => setBoard(data))
             .catch(console.error);
@@ -79,19 +97,31 @@ export default function App() {
 
     return (
         <Router>
-            <div>
-                <div style={{ display: "flex", alignItems: "center", margin: "32px 0 0 0" }}>
-                    <h1 className="app-title">atmon</h1>
-                    <button onClick={toggleTheme} style={{ marginLeft: "auto", padding: "8px 16px", fontSize: "1rem" }}>
-                        {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
-                    </button>
-                </div>
-                <Routes>
-                    <Route path="/boards" element={<BoardListPage />} />
-                    <Route path="/boards/:id" element={<BoardViewPage />} />
-                    <Route path="*" element={<BoardListPage />} />
-                </Routes>
-            </div>
+            <AppContent theme={theme} toggleTheme={toggleTheme} />
         </Router>
+    );
+}
+
+function AppContent({ theme, toggleTheme }) {
+    const navigate = useNavigate();
+    return (
+        <div>
+            <div style={{ display: "flex", alignItems: "center", margin: "32px 0 0 0" }}>
+                <h1 className="app-title">orbitos</h1>
+                <button onClick={toggleTheme} style={{ marginLeft: "auto", padding: "8px 16px", fontSize: "1rem" }}>
+                    {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+                </button>
+                <button onClick={() => signOut(navigate)} style={{ marginLeft: "16px", padding: "8px 16px", fontSize: "1rem" }}>
+                    Sign Out
+                </button>
+            </div>
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/boards" element={<BoardListPage />} />
+                <Route path="/boards/:id" element={<BoardViewPage />} />
+                <Route path="*" element={<BoardListPage />} />
+            </Routes>
+        </div>
     );
 }

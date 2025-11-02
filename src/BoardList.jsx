@@ -8,9 +8,13 @@ export default function BoardList({ boards, onSelect, onBoardCreated, onBoardUpd
 
     function handleSubmit(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch("http://localhost:5000/api/boards", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ name }),
         })
             .then(res => res.json())
@@ -27,9 +31,13 @@ export default function BoardList({ boards, onSelect, onBoardCreated, onBoardUpd
 
     function handleUpdateBoard(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${editBoardId}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ name: editBoardName })
         }).then(res => res.json()).then(updated => {
             setEditBoardId(null);
@@ -39,8 +47,10 @@ export default function BoardList({ boards, onSelect, onBoardCreated, onBoardUpd
     }
 
     function handleDeleteBoard(boardId) {
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${boardId}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).then(() => {
             if (onBoardDeleted) onBoardDeleted(boardId);
         });
@@ -60,7 +70,7 @@ export default function BoardList({ boards, onSelect, onBoardCreated, onBoardUpd
             </form>
             <ul className="board-list-ul">
                 {boards.length === 0 ? (
-                    <li className="board-list-empty">No boards yet. Create one above!</li>
+                    <li className="board-list-empty">No boards yet.</li>
                 ) : (
                     boards.map(board => (
                         <li key={board.id} className="board-list-li">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import StateColumn from "./StateColumn";
-import { DndContext, closestCenter, DragOverlay } from "@dnd-kit/core";
-import { SortableContext, arrayMove, useSortable } from "@dnd-kit/sortable";
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from "@dnd-kit/core";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import "./BoardView.css";
 
 export default function BoardView({ board, goBack }) {
@@ -14,7 +14,10 @@ export default function BoardView({ board, goBack }) {
 
     function fetchStatesAndTasks() {
         console.log('BoardView: fetchStatesAndTasks called');
-        fetch(`http://localhost:5000/api/boards/${board.id}/states`)
+        const token = localStorage.getItem("jwt");
+        fetch(`http://localhost:5000/api/boards/${board.id}/states`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
             .then(res => res.json())
             .then(async data => {
                 setStates(Array.isArray(data) ? data : []);
@@ -22,7 +25,9 @@ export default function BoardView({ board, goBack }) {
                 const tasksByState = {};
                 await Promise.all(
                     (Array.isArray(data) ? data : []).map(async state => {
-                        const res = await fetch(`http://localhost:5000/api/boards/${board.id}/states/${state.id}/tasks`);
+                        const res = await fetch(`http://localhost:5000/api/boards/${board.id}/states/${state.id}/tasks`, {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {}
+                        });
                         const tasks = await res.json();
                         tasksByState[state.id] = Array.isArray(tasks) ? tasks : [];
                     })
@@ -39,9 +44,13 @@ export default function BoardView({ board, goBack }) {
 
     function handleCreateState(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${board.id}/states`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ name: stateName }),
         })
             .then(res => res.json())
@@ -78,7 +87,10 @@ export default function BoardView({ board, goBack }) {
             // Send all task data plus newStateId
             fetch(`http://localhost:5000/api/boards/${boardId}/states/${newStateId}/tasks/${taskId}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(localStorage.getItem("jwt") ? { Authorization: `Bearer ${localStorage.getItem("jwt")}` } : {})
+                },
                 body: JSON.stringify({
                     ...movedTask,
                     state_id: newStateId,
@@ -107,9 +119,13 @@ export default function BoardView({ board, goBack }) {
 
     function handleUpdateState(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${board.id}/states/${editStateId}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ name: editStateName })
         }).then(res => res.json()).then(() => {
             setEditStateId(null);
@@ -119,8 +135,10 @@ export default function BoardView({ board, goBack }) {
     }
 
     function handleDeleteState(stateId) {
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${board.id}/states/${stateId}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).then(() => {
             fetchStatesAndTasks();
         });
@@ -139,23 +157,30 @@ export default function BoardView({ board, goBack }) {
     // Gather all task IDs for SortableContext
     const allTaskIds = Object.values(stateTasks).flat().map(task => task.id);
 
-    // No-op fallback for handlers
-    const noop = () => {};
+    // Only allow mouse dragging, require movement before drag starts
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // Require 8px movement before drag starts
+            },
+        })
+    );
 
     return (
         <div className="board-view-page">
-            <div className="board-view-container">
-                <button onClick={goBack} className="board-view-back-btn">Back to boards</button>
-                <h2 className="board-view-title">{board.name}</h2>
-                <form onSubmit={handleCreateState} className="board-view-form">
-                    <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required className="board-view-input" />
-                    <button type="submit" className="board-view-add-btn">Add Column</button>
-                </form>
-                <DndContext
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTaskDragEnd || noop}
-                    onDragStart={handleTaskDragStart || noop}
-                >
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleTaskDragStart}
+                onDragEnd={handleTaskDragEnd}
+            >
+                <div className="board-view-container">
+                    <button onClick={goBack} className="board-view-back-btn">Back to boards</button>
+                    <h2 className="board-view-title">{board.name}</h2>
+                    <form onSubmit={handleCreateState} className="board-view-form">
+                        <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required className="board-view-input" />
+                        <button type="submit" className="board-view-add-btn">Add Column</button>
+                    </form>
                     <SortableContext items={allTaskIds}>
                         <div className="board-view-columns-row">
                             <div className="board-view-columns">
@@ -192,8 +217,8 @@ export default function BoardView({ board, goBack }) {
                             </div>
                         ) : null}
                     </DragOverlay>
-                </DndContext>
-            </div>
+                </div>
+            </DndContext>
         </div>
     );
 }
