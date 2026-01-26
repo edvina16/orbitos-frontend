@@ -116,10 +116,9 @@ export default function TaskModal({ task, onClose, onSave, onDelete }) {
         margin: 0,
     };
 
-    // Only render TaskModal overlay if reminder modal is not open
     return (
         <>
-            {!reminderOpen && ReactDOM.createPortal(
+            {ReactDOM.createPortal(
                 <div
                     className="task-modal-overlay"
                     onClick={handleOverlayClick}
@@ -211,6 +210,7 @@ export default function TaskModal({ task, onClose, onSave, onDelete }) {
                 <ReminderModal
                     onClose={() => setReminderOpen(false)}
                     onCreate={handleCreateReminder}
+                    noOverlay={true}
                 />
             )}
         </>
