@@ -1,0 +1,114 @@
+/* BoardList styles */
+.board-list-container {
+  max-width: 500px;
+  margin: 48px auto;
+  background: var(--button-bg);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px var(--border);
+  padding: 40px 32px;
+  color: var(--text);
+}
+.board-list-title {
+  margin-bottom: 28px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+.board-list-form {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.board-list-input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 1rem;
+  color: var(--text);
+}
+.board-list-create-btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.board-list-ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.board-list-empty {
+  color: var(--accent-hover);
+  font-style: italic;
+  text-align: center;
+  padding: 16px 0;
+}
+.board-list-li {
+  margin-bottom: 16px;
+}
+.board-list-edit-form {
+  display: flex;
+  gap: 8px;
+}
+.board-list-edit-input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 1rem;
+  color: var(--text);
+}
+.board-list-save-btn {
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: none;
+}
+.board-list-cancel-btn {
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: none;
+}
+.board-list-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.board-list-card-btn {
+  flex: 1;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--button-bg);
+  font-weight: 600;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--accent);
+  box-shadow: none;
+  transition: background 0.2s;
+}
+.board-list-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}

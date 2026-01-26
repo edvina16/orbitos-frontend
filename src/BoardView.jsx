@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from "react";
 import StateColumn from "./StateColumn";
-import { DndContext } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from "@dnd-kit/core";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
+import "./BoardView.css";
 
 export default function BoardView({ board, goBack }) {
     const [states, setStates] = useState([]);
     const [stateTasks, setStateTasks] = useState({});
     const [stateName, setStateName] = useState("");
     const [draggedTask, setDraggedTask] = useState(null);
+    const [editStateId, setEditStateId] = useState(null);
+    const [editStateName, setEditStateName] = useState("");
 
     function fetchStatesAndTasks() {
-        fetch(`http://localhost:5000/api/boards/${board.id}/states`)
+        console.log('BoardView: fetchStatesAndTasks called');
+        const token = localStorage.getItem("jwt");
+        fetch(`http://localhost:5000/api/boards/${board.id}/states`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
             .then(res => res.json())
             .then(async data => {
                 setStates(Array.isArray(data) ? data : []);
@@ -17,25 +25,32 @@ export default function BoardView({ board, goBack }) {
                 const tasksByState = {};
                 await Promise.all(
                     (Array.isArray(data) ? data : []).map(async state => {
-                        const res = await fetch(`http://localhost:5000/api/boards/${board.id}/states/${state.id}/tasks`);
+                        const res = await fetch(`http://localhost:5000/api/boards/${board.id}/states/${state.id}/tasks`, {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {}
+                        });
                         const tasks = await res.json();
                         tasksByState[state.id] = Array.isArray(tasks) ? tasks : [];
                     })
                 );
                 setStateTasks(tasksByState);
+                console.log('BoardView: tasksByState after update', tasksByState);
             })
             .catch(console.error);
     }
 
     useEffect(() => {
         fetchStatesAndTasks();
-    }, [board.id]);
+    }, []); // Remove dependency warning
 
     function handleCreateState(e) {
         e.preventDefault();
+        const token = localStorage.getItem("jwt");
         fetch(`http://localhost:5000/api/boards/${board.id}/states`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({ name: stateName }),
         })
             .then(res => res.json())
@@ -45,48 +60,195 @@ export default function BoardView({ board, goBack }) {
             });
     }
 
-    function handleDragStart(event) {
+    function handleTaskDragStart(event) {
         setDraggedTask(event.active.id);
     }
 
-    function handleDragEnd(event) {
+    function handleTaskDragEnd(event) {
         const { active, over } = event;
+        console.log('BoardView: handleTaskDragEnd', { active, over });
         if (active && over && active.id !== undefined && over.id !== undefined) {
             const taskId = active.id;
             const newStateId = over.id;
             const boardId = board.id;
+            // Find the full task object
+            let movedTask = null;
+            for (const tasks of Object.values(stateTasks)) {
+                const found = tasks.find(t => t.id === taskId);
+                if (found) {
+                    movedTask = found;
+                    break;
+                }
+            }
+            if (!movedTask) {
+                console.error('BoardView: moved task not found', taskId);
+                return;
+            }
+            // Send all task data plus newStateId
             fetch(`http://localhost:5000/api/boards/${boardId}/states/${newStateId}/tasks/${taskId}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            }).then(() => {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(localStorage.getItem("jwt") ? { Authorization: `Bearer ${localStorage.getItem("jwt")}` } : {})
+                },
+                body: JSON.stringify({
+                    ...movedTask,
+                    state_id: newStateId,
+                    board_id: boardId
+                }),
+            })
+            .then(res => {
+                if (!res.ok) {
+                    res.text().then(text => {
+                        console.error('BoardView: move task failed', res.status, text);
+                    });
+                }
+                return res;
+            })
+            .then(() => {
                 fetchStatesAndTasks();
             });
         }
         setDraggedTask(null);
     }
 
-    function onTaskCreated() {
-        fetchStatesAndTasks();
+    function handleEditState(state) {
+        setEditStateId(state.id);
+        setEditStateName(state.name);
     }
 
+    function handleUpdateState(e) {
+        e.preventDefault();
+        const token = localStorage.getItem("jwt");
+        fetch(`http://localhost:5000/api/boards/${board.id}/states/${editStateId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ name: editStateName })
+        }).then(res => res.json()).then(() => {
+            setEditStateId(null);
+            setEditStateName("");
+            fetchStatesAndTasks();
+        });
+    }
+
+    function handleDeleteState(stateId) {
+        const token = localStorage.getItem("jwt");
+        fetch(`http://localhost:5000/api/boards/${board.id}/states/${stateId}`, {
+            method: "DELETE",
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }).then(() => {
+            fetchStatesAndTasks();
+        });
+    }
+
+    function handleCancelEditState() {
+        setEditStateId(null);
+        setEditStateName("");
+    }
+
+    // Find the dragged task object for overlay
+    const draggedTaskObj = draggedTask
+        ? Object.values(stateTasks).flat().find(t => t.id === draggedTask)
+        : null;
+
+    // Gather all task IDs for SortableContext
+    const allTaskIds = Object.values(stateTasks).flat().map(task => task.id);
+
+    // Only allow mouse dragging, require movement before drag starts
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // Require 8px movement before drag starts
+            },
+        })
+    );
+
     return (
-        <div style={{ padding: "32px", background: "#f4f6fa", minHeight: "100vh" }}>
-            <div style={{ maxWidth: "900px", margin: "0 auto", background: "#fff", borderRadius: "16px", boxShadow: "0 4px 16px rgba(0,0,0,0.10)", padding: "40px 32px" }}>
-                <button onClick={goBack} style={{ marginBottom: "16px", padding: "10px 20px", borderRadius: "8px", border: "none", background: "#e0e7ef", color: "#2563eb", fontWeight: "600", cursor: "pointer" }}>Back to boards</button>
-                <h2 style={{ marginBottom: "24px", fontSize: "2rem", fontWeight: "700", color: "#1e293b" }}>{board.name}</h2>
-                <form onSubmit={handleCreateState} style={{ display: "flex", gap: "16px", marginBottom: "32px" }}>
-                    <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#f8fafc", fontSize: "1rem", color: "#334155" }} />
-                    <button type="submit" style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: "linear-gradient(90deg,#22c55e 0%,#16a34a 100%)", color: "#fff", fontWeight: "600", fontSize: "1rem", boxShadow: "0 2px 8px rgba(34,197,94,0.08)", cursor: "pointer", transition: "background 0.2s" }}>Add Column</button>
-                </form>
-                <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto" }}>
-                        {states.map(state => (
-                            <StateColumn key={state.id} state={state} tasks={stateTasks[state.id] || []} dndStateId={state.id} onTaskCreated={onTaskCreated} />
-                        ))}
-                    </div>
-                </DndContext>
-            </div>
+        <div className="board-view-page">
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleTaskDragStart}
+                onDragEnd={handleTaskDragEnd}
+            >
+                <div className="board-view-container">
+                    <button onClick={goBack} className="board-view-back-btn">Back to boards</button>
+                    <h2 className="board-view-title">{board.name}</h2>
+                    <form onSubmit={handleCreateState} className="board-view-form">
+                        <input value={stateName} onChange={e => setStateName(e.target.value)} placeholder="State name" required className="board-view-input" />
+                        <button type="submit" className="board-view-add-btn">Add Column</button>
+                    </form>
+                    <SortableContext items={allTaskIds}>
+                        <div className="board-view-columns-row">
+                            <div className="board-view-columns">
+                                {states.map(state => (
+                                    <SortableStateColumn
+                                        key={state.id}
+                                        id={state.id}
+                                        state={state}
+                                        tasks={stateTasks[state.id] || []}
+                                        dndStateId={state.id}
+                                        onTasksChanged={(action, payload) => {
+                                            if (action === 'editState') handleEditState(payload);
+                                            else if (action === 'deleteState') handleDeleteState(payload);
+                                            else fetchStatesAndTasks();
+                                        }}
+                                        editStateId={editStateId}
+                                        editStateName={editStateName}
+                                        onUpdateState={handleUpdateState}
+                                        setEditStateName={setEditStateName}
+                                        handleCancelEditState={handleCancelEditState}
+                                        handleTaskDragEnd={handleTaskDragEnd}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </SortableContext>
+                    <DragOverlay>
+                        {draggedTaskObj ? (
+                            <div style={{ zIndex: 9999 }}>
+                                <div className="task-card task-card-relative" style={{ pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', background: 'var(--bg)', color: 'var(--text)', borderRadius: 8 }}>
+                                    <strong className="task-card-title">{draggedTaskObj.title}</strong>
+                                    <div className="task-card-content">{draggedTaskObj.content}</div>
+                                </div>
+                            </div>
+                        ) : null}
+                    </DragOverlay>
+                </div>
+            </DndContext>
+        </div>
+    );
+}
+
+function SortableStateColumn(props) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.id });
+    return (
+        <div ref={setNodeRef} style={{
+            transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+            transition,
+            opacity: isDragging ? 0.5 : 1,
+            position: 'relative',
+        }}>
+            <div
+                {...attributes}
+                {...listeners}
+                className="state-column-drag-bar"
+                style={{
+                    width: '100%',
+                    height: 32,
+                    background: 'transparent',
+                    cursor: 'grab',
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                    userSelect: 'none',
+                    zIndex: 3,
+                }}
+                aria-label="Drag column"
+            />
+            <StateColumn {...props} />
         </div>
     );
 }
