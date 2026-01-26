@@ -1,86 +1,127 @@
-import { useEffect, useState } from "react";
+// This file sets up React Router for your frontend, matching your Go backend API routes.
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from "react-router-dom";
+import BoardList from "./BoardList";
+import BoardView from "./BoardView";
+import Login from "./Login";
+import SignUp from "./SignUp";
+import { signOut } from "./auth";
 
-function App() {
-  const [tasks, setTasks] = useState([]);
-  const [form, setForm] = useState({ title: "", content: "" });
+function BoardListPage() {
+    const [boards, setBoards] = React.useState([]);
+    const navigate = useNavigate();
 
-  // Fetch tasks from backend
-  const fetchTasks = () => {
-    fetch("http://localhost:5000/api/tasks")
-      .then(res => res.json())
-      .then(data => setTasks(Array.isArray(data) ? data : []))
-      .catch(err => {
-        console.error("Failed to fetch tasks:", err);
-        setTasks([]);
-      });
-  };
-
-  useEffect(fetchTasks, []);
-
-  // Handle form changes
-  const handleChange = e => {
-    const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
-  };
-
-  // Handle form submit
-  const handleSubmit = e => {
-    e.preventDefault();
-    fetch("http://localhost:5000/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    })
-      .then(res => {
-        if (res.ok) {
-          setForm({ title: "", content: "" });
-          fetchTasks();
+    React.useEffect(() => {
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            navigate("/login");
+            return;
         }
-      });
-  };
+        fetchBoards();
+    }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-4xl font-bold mb-6 text-blue-600">My Tasks</h1>
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded shadow p-4 max-w-md mx-auto mb-8"
-      >
-        <input
-          name="title"
-          value={form.title}
-          onChange={handleChange}
-          placeholder="Title"
-          className="w-full mb-2 p-2 border rounded"
-          required
+    function fetchBoards() {
+        const token = localStorage.getItem("jwt");
+        fetch("http://localhost:5000/api/boards", {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+            .then(res => res.json())
+            .then(data => setBoards(Array.isArray(data) ? data : []))
+            .catch(console.error);
+    }
+
+    function handleSelectBoard(board) {
+        navigate(`/boards/${board.id}`);
+    }
+
+    function handleBoardCreated(newBoard) {
+        fetchBoards();
+    }
+
+    function handleBoardUpdated() {
+        fetchBoards();
+    }
+
+    function handleBoardDeleted() {
+        fetchBoards();
+    }
+
+    return (
+        <BoardList
+            boards={boards}
+            onSelect={handleSelectBoard}
+            onBoardCreated={handleBoardCreated}
+            onBoardUpdated={handleBoardUpdated}
+            onBoardDeleted={handleBoardDeleted}
         />
-        <textarea
-          name="content"
-          value={form.content}
-          onChange={handleChange}
-          placeholder="Content"
-          className="w-full mb-2 p-2 border rounded"
-          required
-        />
-        <button className="bg-blue-600 text-white px-4 py-2 rounded">
-          Add Task
-        </button>
-      </form>
-      <div className="max-w-md mx-auto">
-        {tasks.length === 0 && (
-          <div className="bg-white rounded shadow p-4 mb-3 text-lg text-black">
-            No tasks found.
-          </div>
-        )}
-        {tasks.map((task) => (
-          <div key={task.id} className="bg-white rounded shadow p-4 mb-3 text-black">
-            <div className="font-bold text-lg">{task.title}</div>
-            <div>{task.content}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    );
 }
 
-export default App;
+function BoardViewPage() {
+    const { id } = useParams();
+    const [board, setBoard] = React.useState(null);
+    const navigate = useNavigate();
+
+    React.useEffect(() => {
+        const token = localStorage.getItem("jwt");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+        fetch(`http://localhost:5000/api/boards/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(res => res.json())
+            .then(data => setBoard(data))
+            .catch(console.error);
+    }, [id]);
+
+    if (!board) return <div>Loading...</div>;
+    return <BoardView board={board} goBack={() => navigate("/boards")} />;
+}
+
+export default function App() {
+    const [theme, setTheme] = useState(() => {
+        return localStorage.getItem("theme") || "dark";
+    });
+
+    useEffect(() => {
+        document.documentElement.classList.remove("light", "dark");
+        document.documentElement.classList.add(theme);
+        localStorage.setItem("theme", theme);
+    }, [theme]);
+
+    function toggleTheme() {
+        setTheme(t => (t === "dark" ? "light" : "dark"));
+    }
+
+    return (
+        <Router>
+            <AppContent theme={theme} toggleTheme={toggleTheme} />
+        </Router>
+    );
+}
+
+function AppContent({ theme, toggleTheme }) {
+    const navigate = useNavigate();
+    return (
+        <div>
+            <div style={{ display: "flex", alignItems: "center", margin: "32px 0 0 0" }}>
+                <h1 className="app-title">orbitos</h1>
+                <button onClick={toggleTheme} style={{ marginLeft: "auto", padding: "8px 16px", fontSize: "1rem" }}>
+                    {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+                </button>
+                <button onClick={() => signOut(navigate)} style={{ marginLeft: "16px", padding: "8px 16px", fontSize: "1rem" }}>
+                    Sign Out
+                </button>
+            </div>
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/boards" element={<BoardListPage />} />
+                <Route path="/boards/:id" element={<BoardViewPage />} />
+                <Route path="*" element={<BoardListPage />} />
+            </Routes>
+        </div>
+    );
+}
